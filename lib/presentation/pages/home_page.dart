@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_application_1/data/models/forecast.dart';
 import 'package:flutter_application_1/data/models/weather.dart';
 import 'package:flutter_application_1/data/models/weather_condition.dart';
 import 'package:flutter_application_1/presentation/providers/weather_providers.dart';
 import 'package:flutter_application_1/presentation/widgets/city_search_sheet.dart';
-import 'package:flutter_application_1/presentation/widgets/glass_card.dart';
-import 'package:flutter_application_1/presentation/widgets/shimmer_loading.dart';
-import 'package:flutter_application_1/presentation/widgets/weather_background.dart';
 
 class WeatherHomePage extends ConsumerWidget {
   const WeatherHomePage({super.key});
@@ -17,25 +13,15 @@ class WeatherHomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final weatherAsync = ref.watch(currentWeatherProvider);
 
-    final condition = weatherAsync.valueOrNull != null
-        ? WeatherCondition.fromString(weatherAsync.valueOrNull!.condition)
-        : WeatherCondition.clear;
-    final isNight = DateTime.now().hour < 6 || DateTime.now().hour >= 20;
-
-    return WeatherBackground(
-      condition: condition,
-      isNight: isNight,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: SafeArea(
-          child: weatherAsync.when(
-            loading: () => const ShimmerLoading(),
-            error: (e, _) => _ErrorView(
-              message: e.toString().replaceFirst('WeatherException: ', ''),
-              onRetry: () => ref.invalidate(currentWeatherProvider),
-            ),
-            data: (weather) => _WeatherContent(weather: weather),
+    return Scaffold(
+      body: SafeArea(
+        child: weatherAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => _ErrorView(
+            message: e.toString().replaceFirst('WeatherException: ', ''),
+            onRetry: () => ref.invalidate(currentWeatherProvider),
           ),
+          data: (weather) => _WeatherContent(weather: weather),
         ),
       ),
     );
@@ -52,16 +38,28 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text('⚠️', style: TextStyle(fontSize: 48)),
-          const SizedBox(height: 12),
-          Text(message, style: const TextStyle(color: Colors.white70, fontSize: 16)),
-          const SizedBox(height: 20),
-          ElevatedButton(onPressed: onRetry, child: const Text('Повторить')),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_off, size: 64, color: colorScheme.onSurfaceVariant),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 16),
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Повторить'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -78,33 +76,27 @@ class _WeatherContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final hourlyAsync = ref.watch(hourlyForecastProvider);
     final forecastAsync = ref.watch(forecastProvider);
-    final condition = WeatherCondition.fromString(weather.condition);
 
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       children: [
         const SizedBox(height: 8),
-        _TopBar(city: weather.cityName)
-            .animate().fadeIn(delay: 0.ms).slideY(begin: -0.2),
+        _TopBar(city: weather.cityName),
         const SizedBox(height: 32),
-        _MainTemperature(weather: weather, condition: condition)
-            .animate().fadeIn(delay: 150.ms).slideY(begin: 0.3),
+        _MainTemperature(weather: weather),
         const SizedBox(height: 24),
-        _WeatherDetails(weather: weather)
-            .animate().fadeIn(delay: 300.ms).slideY(begin: 0.3),
-        const SizedBox(height: 20),
+        _WeatherDetails(weather: weather),
+        const SizedBox(height: 16),
         hourlyAsync.when(
-          loading: () => const ShimmerBox(height: 110),
+          loading: () => const LinearProgressIndicator(),
           error: (e, st) => const SizedBox.shrink(),
-          data: (hourly) => _HourlyForecast(items: hourly)
-              .animate().fadeIn(delay: 450.ms).slideY(begin: 0.3),
+          data: (hourly) => _HourlyForecast(items: hourly),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
         forecastAsync.when(
-          loading: () => const ShimmerBox(height: 240),
+          loading: () => const LinearProgressIndicator(),
           error: (e, st) => const SizedBox.shrink(),
-          data: (daily) => _DailyForecast(items: daily)
-              .animate().fadeIn(delay: 600.ms).slideY(begin: 0.3),
+          data: (daily) => _DailyForecast(items: daily),
         ),
         const SizedBox(height: 24),
       ],
@@ -121,23 +113,21 @@ class _TopBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(city, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w500)),
-            Text(_formattedDate(), style: const TextStyle(color: Color(0xB3FFFFFF), fontSize: 13)),
+            Text(city, style: textTheme.titleLarge),
+            Text(_formattedDate(), style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant)),
           ],
         ),
-        GestureDetector(
-          onTap: () => _openSearch(context, ref),
-          child: GlassCard(
-            padding: const EdgeInsets.all(10),
-            borderRadius: 14,
-            child: const Icon(Icons.search, color: Colors.white, size: 22),
-          ),
+        IconButton.filledTonal(
+          onPressed: () => _openSearch(context, ref),
+          icon: const Icon(Icons.search),
         ),
       ],
     );
@@ -147,7 +137,6 @@ class _TopBar extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => UncontrolledProviderScope(
         container: ProviderScope.containerOf(context),
         child: CitySearchSheet(
@@ -171,31 +160,29 @@ class _TopBar extends ConsumerWidget {
 
 class _MainTemperature extends StatelessWidget {
   final Weather weather;
-  final WeatherCondition condition;
 
-  const _MainTemperature({required this.weather, required this.condition});
+  const _MainTemperature({required this.weather});
 
   @override
   Widget build(BuildContext context) {
+    final condition = WeatherCondition.fromString(weather.condition);
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       children: [
         Text(
           '${weather.temperature.toStringAsFixed(0)}°',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 96,
-            fontWeight: FontWeight.w100,
-            height: 1,
-            shadows: [Shadow(color: Colors.black26, blurRadius: 16)],
-          ),
+          style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                fontSize: 96,
+                fontWeight: FontWeight.w100,
+                color: colorScheme.onSurface,
+              ),
         ),
         const SizedBox(height: 4),
         Text(condition.emoji, style: const TextStyle(fontSize: 48)),
         const SizedBox(height: 8),
         Text(
           weather.description,
-          style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 16,
-              shadows: [Shadow(color: Colors.black26, blurRadius: 8)]),
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant),
         ),
       ],
     );
@@ -211,21 +198,24 @@ class _WeatherDetails extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _DetailItem(icon: '💧', value: '${weather.humidity}%', label: 'Влажность'),
-          _DetailItem(icon: '💨', value: '${weather.windSpeed} м/с', label: 'Ветер'),
-          _DetailItem(icon: '🌡', value: '${weather.feelsLike.toStringAsFixed(0)}°C', label: 'Ощущается'),
-        ],
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _DetailItem(icon: Icons.water_drop_outlined, value: '${weather.humidity}%', label: 'Влажность'),
+            _DetailItem(icon: Icons.air, value: '${weather.windSpeed} м/с', label: 'Ветер'),
+            _DetailItem(icon: Icons.thermostat, value: '${weather.feelsLike.toStringAsFixed(0)}°C', label: 'Ощущается'),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _DetailItem extends StatelessWidget {
-  final String icon;
+  final IconData icon;
   final String value;
   final String label;
 
@@ -233,12 +223,13 @@ class _DetailItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       children: [
-        Text(icon, style: const TextStyle(fontSize: 22)),
-        const SizedBox(height: 4),
-        Text(value, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
-        Text(label, style: const TextStyle(color: Color(0xB3FFFFFF), fontSize: 12)),
+        Icon(icon, color: colorScheme.primary, size: 24),
+        const SizedBox(height: 6),
+        Text(value, style: Theme.of(context).textTheme.titleMedium),
+        Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant)),
       ],
     );
   }
@@ -253,37 +244,41 @@ class _HourlyForecast extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return SizedBox(
       height: 110,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: items.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 10),
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
           final item = items[i];
           final isNow = i == 0;
           final condition = WeatherCondition.fromString(item.condition);
-          return GlassCard(
-            tint: isNow ? const Color(0xFF7EB8F7) : null,
-            borderRadius: 16,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                Text(
-                  isNow ? 'Сейчас' : '${item.time.hour}:00',
-                  style: TextStyle(
-                    color: isNow ? Colors.white : const Color(0xB3FFFFFF),
-                    fontSize: 12,
-                    fontWeight: isNow ? FontWeight.w600 : FontWeight.normal,
+          return Card(
+            color: isNow ? colorScheme.primaryContainer : null,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  Text(
+                    isNow ? 'Сейчас' : '${item.time.hour}:00',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: isNow ? colorScheme.onPrimaryContainer : colorScheme.onSurfaceVariant,
+                          fontWeight: isNow ? FontWeight.w600 : FontWeight.normal,
+                        ),
                   ),
-                ),
-                Text(condition.emoji, style: const TextStyle(fontSize: 20)),
-                Text(
-                  '${item.temperature.toStringAsFixed(0)}°',
-                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
-                ),
-              ],
+                  Text(condition.emoji, style: const TextStyle(fontSize: 20)),
+                  Text(
+                    '${item.temperature.toStringAsFixed(0)}°',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: isNow ? colorScheme.onPrimaryContainer : colorScheme.onSurface,
+                        ),
+                  ),
+                ],
+              ),
             ),
           );
         },
@@ -301,9 +296,11 @@ class _DailyForecast extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Column(children: items.map((item) => _DailyRow(item: item)).toList()),
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(children: items.map((item) => _DailyRow(item: item)).toList()),
+      ),
     );
   }
 }
@@ -317,24 +314,31 @@ class _DailyRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final condition = WeatherCondition.fromString(item.condition);
     final isToday = _isToday(item.date);
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
           SizedBox(
             width: 80,
             child: Text(
               isToday ? 'Сегодня' : _weekday(item.date),
-              style: const TextStyle(color: Colors.white, fontSize: 14),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: isToday ? FontWeight.w600 : FontWeight.normal,
+                  ),
             ),
           ),
           Text(condition.emoji, style: const TextStyle(fontSize: 18)),
           const Spacer(),
-          Text('${item.tempMin.toStringAsFixed(0)}°',
-              style: const TextStyle(color: Color(0xB3FFFFFF), fontSize: 14)),
-          const SizedBox(width: 8),
-          Text('${item.tempMax.toStringAsFixed(0)}°',
-              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+          Text(
+            '${item.tempMin.toStringAsFixed(0)}°',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            '${item.tempMax.toStringAsFixed(0)}°',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
         ],
       ),
     );
