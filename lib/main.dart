@@ -1,22 +1,26 @@
-// ignore_for_file: must_be_immutable
-
 import 'package:flutter/material.dart';
-import 'package:flutter_application_1/pages/home_page.dart';
-import 'package:flutter_application_1/pages/settings_page.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_application_1/core/constants/app_theme.dart';
+import 'package:flutter_application_1/presentation/pages/home_page.dart';
+import 'package:flutter_application_1/presentation/providers/weather_providers.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const ProviderScope(child: MyApp()));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(appThemeModeProvider);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: HomePage(),
-      routes: {'/settings': (context) => SettingsPage()},
+      title: 'WeatherVibe',
+      theme: AppTheme.darkTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
+      home: const WeatherHomePage(),
     );
   }
 }
